@@ -1579,10 +1579,10 @@ body.dark .dark-toggle{background:#1a1a2e;border-color:#2a2a40}
 
 /* ============================================================
    SUPABASE INTEGRATION
-   URL: https://airadxlazjwgnoqwdxoz.supabase.co
+   URL: https://lufkyatgontemdxxmeia.supabase.co
 ============================================================ */
-const SB_URL='https://airadxlazjwgnoqwdxoz.supabase.co';
-const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFpcmFkeGxhemp3Z25vcXdkeG96Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU1NTI0NDcsImV4cCI6MjEwMTEyODQ0N30.IUg4746lyYZ6zMFv5rF0fLGG1R1fg-X2LmCfpIllahU';
+const SB_URL='https://lufkyatgontemdxxmeia.supabase.co';
+const SB_KEY='sb_publishable_353gZohQ5Q1DML0AYqWDxQ_DGJTwf37';
 
 async function sbFetch(table,method='GET',body=null,query=''){
   const opts={
@@ -2856,8 +2856,16 @@ async function addProduct(){
   };
   const result=await sbFetch('products','POST',row,'');
   if(!result||!result[0]){
+    // Try to get more details
+    const testResult=await sbFetch('products','GET',null,'?limit=1');
+    let errMsg='Erro ao guardar! ';
+    if(testResult===null){
+      errMsg+='Sem ligacao ao Supabase. Verifica a internet.';
+    }else{
+      errMsg+='Tabela products inacessivel. Verifica as policies no Supabase.';
+    }
     msgEl.style.color='var(--red)';
-    msgEl.textContent='Erro ao guardar! Verifica a ligacao ao Supabase.';
+    msgEl.textContent=errMsg;
     return;
   }
 
