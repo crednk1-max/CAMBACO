@@ -1592,24 +1592,29 @@ async function sbFetch(table,method='GET',body=null,query=''){
     'Content-Type':'application/json',
     'Prefer':'return=representation'
   };
-  const controller=new AbortController();
-  const tid=setTimeout(()=>controller.abort(),10000);
-  try{
-    let url=base;
-    let opts={method,headers,signal:controller.signal};
-    if(method==='GET'||method==='DELETE') url+=query;
-    if(body) opts.body=JSON.stringify(body);
-    if(method==='PATCH'||method==='DELETE') url=base+query;
-    const r=await fetch(url,opts);
-    clearTimeout(tid);
-    const txt=await r.text();
-    if(!r.ok){console.error('SB',method,table,r.status,txt);return null;}
-    return txt?JSON.parse(txt):[];
-  }catch(e){
-    clearTimeout(tid);
-    console.error('SB fetch error:',e.message);
-    return null;
+  // Retry up to 3 times
+  for(let attempt=1;attempt<=3;attempt++){
+    try{
+      let url=base;
+      let opts={method,headers};
+      if(method==='GET'||method==='DELETE') url+=query;
+      if(body) opts.body=JSON.stringify(body);
+      if(method==='PATCH'||method==='DELETE') url=base+query;
+      const r=await fetch(url,opts);
+      const txt=await r.text();
+      if(!r.ok){
+        console.error('SB',method,table,r.status,txt);
+        if(attempt<3){await new Promise(res=>setTimeout(res,2000));continue;}
+        return null;
+      }
+      return txt?JSON.parse(txt):[];
+    }catch(e){
+      console.error('SB attempt '+attempt+' error:',e.message);
+      if(attempt<3){await new Promise(res=>setTimeout(res,2000));continue;}
+      return null;
+    }
   }
+  return null;
 }
 
 async function sbSaveConfig(key,value){
@@ -2870,7 +2875,7 @@ async function addProduct(){
   const result=await sbFetch('products','POST',row,'');
   if(result===null){
     msgEl.style.color='var(--red)';
-    msgEl.textContent='Erro ao guardar! Verifica a ligacao.';
+    msgEl.innerHTML='Erro de ligacao! <button onclick="addProduct()" style="background:var(--red);color:#fff;border:none;padding:4px 10px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;margin-left:6px">Tentar de novo</button>';
     return;
   }
 
