@@ -1584,32 +1584,53 @@ body.dark .dark-toggle{background:#1a1a2e;border-color:#2a2a40}
 const SB_URL='https://lufkyatgontemdxxmeia.supabase.co';
 const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx1Zmt5YXRnb250ZW1keHhtZWlhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg1NDM1MzMsImV4cCI6MjEwNDExOTUzM30.zOZ0n9f_mdpET95QVTfD8Haqh_9G9tLpZP0aLcTrJf4';
 
-async function sbFetch(table,method='GET',body=null,query=''){
-  const controller=new AbortController();
-  const timeout=setTimeout(()=>controller.abort(),8000);
-  const opts={
-    method,
-    headers:{
-      'apikey':SB_KEY,
-      'Authorization':'Bearer '+SB_KEY,
-      'Content-Type':'application/json',
-      'Prefer':'return=representation',
-      'Accept':'application/json'
-    },
-    signal:controller.signal
-  };
-  if(body)opts.body=JSON.stringify(body);
+// Supabase via SDK
+let _sb=null;
+async function getSB(){
+  if(_sb)return _sb;
   try{
-    const r=await fetch(SB_URL+'/rest/v1/'+table+query,opts);
-    clearTimeout(timeout);
-    const text=await r.text();
-    if(!r.ok){console.error('SB Error on '+table+' ('+r.status+'):',text);return null}
-    return text?JSON.parse(text):[];
-  }catch(e){
-    clearTimeout(timeout);
-    console.error('SB Fetch error:',e);
-    return null;
-  }
+    const m=await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm');
+    _sb=m.createClient(SB_URL,SB_KEY);
+    return _sb;
+  }catch(e){console.error('SB SDK:',e);return null}
+}
+
+async function sbFetch(table,method='GET',body=null,query=''){
+  const sb=await getSB();
+  if(!sb)return null;
+  try{
+    if(method==='GET'){
+      const {data,error}=await sb.from(table).select('*');
+      if(error){console.error('SB GET:',error);return null}
+      return data||[];
+    }
+    if(method==='POST'){
+      const {data,error}=await sb.from(table).insert(body).select();
+      if(error){console.error('SB POST:',error.message,error.details);return null}
+      return data||[];
+    }
+    if(method==='PATCH'){
+      const match=query.match(/id=eq\.([^&]+)/);
+      if(!match)return null;
+      const {data,error}=await sb.from(table).update(body).eq('id',match[1]).select();
+      if(error){console.error('SB PATCH:',error);return null}
+      return data||[];
+    }
+    if(method==='DELETE'){
+      const match=query.match(/id=eq\.([^&]+)/);
+      if(!match)return null;
+      const {error}=await sb.from(table).delete().eq('id',match[1]);
+      if(error){console.error('SB DELETE:',error);return null}
+      return [];
+    }
+  }catch(e){console.error('SB error:',e);return null}
+  return null;
+}
+
+async function sbSaveConfig(key,value){
+  const sb=await getSB();
+  if(!sb)return;
+  await sb.from('config').upsert({key,value:String(value)},{onConflict:'key'});
 }
 
 // CRUD helpers
