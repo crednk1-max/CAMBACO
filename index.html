@@ -1585,6 +1585,8 @@ const SB_URL='https://lufkyatgontemdxxmeia.supabase.co';
 const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx1Zmt5YXRnb250ZW1keHhtZWlhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg1NDM1MzMsImV4cCI6MjEwNDExOTUzM30.zOZ0n9f_mdpET95QVTfD8Haqh_9G9tLpZP0aLcTrJf4';
 
 async function sbFetch(table,method='GET',body=null,query=''){
+  const controller=new AbortController();
+  const timeout=setTimeout(()=>controller.abort(),8000);
   const opts={
     method,
     headers:{
@@ -1594,14 +1596,20 @@ async function sbFetch(table,method='GET',body=null,query=''){
       'Prefer':'return=representation',
       'Accept':'application/json'
     },
+    signal:controller.signal
   };
   if(body)opts.body=JSON.stringify(body);
   try{
     const r=await fetch(SB_URL+'/rest/v1/'+table+query,opts);
+    clearTimeout(timeout);
     const text=await r.text();
     if(!r.ok){console.error('SB Error on '+table+' ('+r.status+'):',text);return null}
     return text?JSON.parse(text):[];
-  }catch(e){console.error('SB Fetch error:',e);return null}
+  }catch(e){
+    clearTimeout(timeout);
+    console.error('SB Fetch error:',e);
+    return null;
+  }
 }
 
 // CRUD helpers
