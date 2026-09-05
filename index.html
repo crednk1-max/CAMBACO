@@ -1621,6 +1621,17 @@ async function sbSaveConfig(key,value){
   await sbFetch('config','POST',{key,value:String(value)},'?on_conflict=key');
 }
 
+/* Keep Supabase alive - ping every 25 seconds */
+function startKeepAlive(){
+  setInterval(async()=>{
+    try{
+      await fetch(SB_URL+'/rest/v1/config?select=key&limit=1',{
+        headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY}
+      });
+    }catch(e){}
+  },25000);
+}
+
 // CRUD helpers
 const SB={
   get:  (t,q='')=>sbFetch(t,'GET',null,q),
@@ -2078,6 +2089,7 @@ function enterApp(){
   navTo('shop');
   renderAll();
   updateUI();
+  startKeepAlive();
   setTimeout(()=>{renderLoyaltyCard('loyalty-card-me');renderReferralCard('referral-card-me')},100);
   // Restore promo banner
   if(bannerData.promoText)showPromoBanner(bannerData.promoText);
@@ -3154,7 +3166,9 @@ function resellerCardHTML(r){
 function suspendReseller(id){
   const r=resellers.find(x=>x.id===id);
   if(!r||!confirm('Suspender revendedor '+r.name+'?'))return;
-  r.status='suspended';saveDB();renderAdmResellers();showToast(r.name+' suspenso');
+  r.status='suspended';saveDB();
+  sbFetch('resellers','PATCH',{status:'suspended'},'?id=eq.'+id);
+  renderAdmResellers();showToast(r.name+' suspenso');
 }
 function renewReseller(id){
   const r=resellers.find(x=>x.id===id);
@@ -3165,7 +3179,9 @@ function renewReseller(id){
   const from=new Date()>new Date(r.endDate)?new Date():new Date(r.endDate);
   const end=new Date(from);end.setDate(end.getDate()+days);
   r.endDate=end.toISOString();r.days+=days;
-  saveDB();renderAdmResellers();showToast(r.name+' renovado por '+days+' dias!');
+  saveDB();
+  sbFetch('resellers','PATCH',{status:'active',end_date:r.endDate,days:r.days},'?id=eq.'+id);
+  renderAdmResellers();showToast(r.name+' renovado por '+days+' dias!');
 }
 function extendReseller(id){
   const r=resellers.find(x=>x.id===id);
@@ -3174,13 +3190,17 @@ function extendReseller(id){
   if(isNaN(days)||days<1)return;
   const end=new Date(r.endDate);end.setDate(end.getDate()+days);
   r.endDate=end.toISOString();r.days+=days;
-  saveDB();renderAdmResellers();showToast('+'+days+' dias adicionados ao contrato de '+r.name);
+  saveDB();
+  sbFetch('resellers','PATCH',{end_date:r.endDate,days:r.days},'?id=eq.'+id);
+  renderAdmResellers();showToast('+'+days+' dias adicionados ao contrato de '+r.name);
 }
 function deleteReseller(id){
   const r=resellers.find(x=>x.id===id);
   if(!r||!confirm('Remover completamente '+r.name+'? Esta acao nao pode ser desfeita.'))return;
   resellers=resellers.filter(x=>x.id!==id);
-  saveDB();renderAdmResellers();renderAdmStats();showToast('Revendedor removido');
+  saveDB();
+  sbFetch('resellers','DELETE',null,'?id=eq.'+id);
+  renderAdmResellers();renderAdmStats();showToast('Revendedor removido');
 }
 function viewResellerOrders(id){
   const r=resellers.find(x=>x.id===id);
